@@ -1,3 +1,15 @@
+function execute
+    if test (count $argv) -eq 0
+        return 0
+    end
+    if which $argv[1] > /dev/null
+        eval $argv
+        return $status
+    else
+        return 1
+    end
+end
+
 function aws-ops -d 'switch to zenika-ops aws env vars'
     set -x AWS_ACCESS_KEY $AWS_OPS_ACCESS_KEY_ID
     set -x AWS_SECRET_KEY $AWS_OPS_SECRET_ACCESS_KEY
@@ -29,7 +41,30 @@ function docker-clean-dangling-images -d 'Remove dangling images'
 end
 
 function minikube-update -d 'Install latest minikube release'
-    curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 ; and chmod +x minikube ; and mv minikube ~/.local/bin/
+    execute minikube version > /dev/null ^ /dev/null
+    if test $status -eq 0
+        set current_version (minikube version | cut -d " " -f 3)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "Minikube is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/kubernetes/minikube/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+      set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest, downloading..."
+        curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/{$target_version}/minikube-linux-amd64 ; and chmod +x minikube ; and mv minikube ~/.local/bin/
+        execute minikube version > /dev/null ^ /dev/null
+        if test $status -eq 0
+            echo "Installed version "(minikube version | cut -d " " -f 3)
+        else
+            echo "Minikube could not be installed, check logs"
+        end
+    end
 end
 
 function kubectl-update -d 'Update kubectl to latest release'
