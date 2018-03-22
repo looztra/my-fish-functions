@@ -56,7 +56,7 @@ function minikube-update -d 'Install latest minikube release'
     if [ $target_version = $current_version ]
         echo "Current version is already target/latest"
     else
-        echo "Current version is not target/latest, downloading..."
+        echo "Current version is not target/latest ($target_version), downloading..."
         curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/{$target_version}/minikube-linux-amd64 ; and chmod +x minikube ; and mv minikube ~/.local/bin/
         execute minikube version > /dev/null ^ /dev/null
         if test $status -eq 0
@@ -69,6 +69,8 @@ end
 
 function kubectl-update -d 'Update kubectl to latest release'
     curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl ; and chmod +x kubectl ; and mv kubectl ~/.local/bin/
+    which kubectl
+    kubectl version
 end
 
 function compose-update -d 'Update docker-compose to version provided in param or latest release if no param provided'
