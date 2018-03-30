@@ -118,7 +118,7 @@ function clean-packagekit-cache -d 'Clean effing PackageKit cache'
     echo "Nettoyage..."
     sudo pkcon refresh force -c -1
     echo "Consommation cache APRES"
-    sudo du -khs /var/cache/PackageKit/*
+    sudo du -khs /var/cache/PackageKit/
     echo "Détail"
     sudo du -khs /var/cache/PackageKit/*
 end
