@@ -110,3 +110,15 @@ function terraform-update -d 'Update terraform to latest release'
     terraform version
 end
 
+function clean-packagekit-cache -d 'Clean effing PackageKit cache'
+    echo "Consommation cache AVANT"
+    sudo du -khs /var/cache/PackageKit/
+    echo "Détail"
+    sudo du -khs /var/cache/PackageKit/*
+    echo "Nettoyage..."
+    sudo pkcon refresh force -c -1
+    echo "Consommation cache APRES"
+    sudo du -khs /var/cache/PackageKit/*
+    echo "Détail"
+    sudo du -khs /var/cache/PackageKit/*
+end
