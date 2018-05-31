@@ -67,6 +67,39 @@ function minikube-update -d 'Install latest minikube release'
     end
 end
 
+function minishift-update -d 'Install latest minishift release'
+    execute minishift version > /dev/null ^ /dev/null
+    if test $status -eq 0
+        set current_version (minishift version | cut -d "+" -f 1 | cut -d " " -f 2)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "Minishift is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/minishift/minishift/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+      set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        curl -Lo $HOME/tmp/minishift.tgz https://github.com/minishift/minishift/releases/download/{$target_version}/minishift-{$target_version_short}-linux-amd64.tgz ; \
+            and tar --directory $HOME/tmp -xf $HOME/tmp/minishift.tgz ; \
+            and chmod +x $HOME/tmp/minishift-{$target_version_short}-linux-amd64/minishift
+            and mv $HOME/tmp/minishift-{$target_version_short}-linux-amd64/minishift ~/.local/bin/ ; \
+            and rm -rf $HOME/tmp/minishift-{$target_version_short}-linux-amd64 $HOME/tmp/minishift.tgz
+        execute minishift version > /dev/null ^ /dev/null
+        if test $status -eq 0
+            echo "Installed version "(minishift version | cut -d "+" -f 1 | cut -d " " -f 2)
+        else
+            echo "minishift could not be installed, check logs"
+        end
+    end
+end
+
+
 function kubectl-update -d 'Update kubectl to latest release'
     curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl ; and chmod +x kubectl ; and mv kubectl ~/.local/bin/
     which kubectl
