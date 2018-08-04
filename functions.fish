@@ -99,11 +99,46 @@ function minishift-update -d 'Install latest minishift release'
     end
 end
 
-
 function kubectl-update -d 'Update kubectl to latest release'
-    curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl ; and chmod +x kubectl ; and mv kubectl ~/.local/bin/
-    which kubectl
-    kubectl version
+    set -l binary kubectl
+    set -l binary_artifact $binary
+    set -l tmpdir (mktemp -d)
+    set -l binary_version_cmd $binary version --client --short
+    set -l version_url https://storage.googleapis.com/kubernetes-release/release/stable.txt
+    function compute_artifact_url
+      set -l t_version $argv[1]
+      set -l t_artifact $argv[2]
+      printf "https://storage.googleapis.com/kubernetes-release/release/$t_version/bin/linux/amd64/$t_artifact"
+    end
+    #
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (execute $binary_version_cmd | cut -d " " -f 3)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "$binary is not installed yet"
+    end
+    set target_version (curl -s $version_url)
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest ($target_version)"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        echo "target_url "(compute_artifact_url $target_version $binary_artifact)
+        curl -Lo $tmpdir/$binary (compute_artifact_url $target_version $binary_artifact)
+        and chmod +x $tmpdir/$binary
+        and mv $tmpdir/$binary ~/.local/bin/
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 3)
+        else
+            echo "$binary could not be installed, check logs"
+        end
+    end
+    rm -rf $tmpdir
 end
 
 function compose-update -d 'Update docker-compose to version provided in param or latest release if no param provided'
