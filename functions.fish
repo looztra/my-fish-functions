@@ -141,6 +141,47 @@ function kubectl-update -d 'Update kubectl to latest release'
     rm -rf $tmpdir
 end
 
+function oc-update -d 'Update oc to latest release'
+    set -l binary oc
+    set -l binary_artifact {$binary}.tar.gz
+    set -l tmpdir (mktemp -d)
+    mkdir -p $tmpdir/untar
+    set -l binary_version_cmd $binary version
+    #
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (execute $binary_version_cmd | head -n 1 | cut -d " " -f 2)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "$binary is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/openshift/origin/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest ($target_version)"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set -l target_artifact_path (curl -s https://api.github.com/repos/openshift/origin/releases/latest | jq '.assets[1].name' | tr -d '"')
+        set -l target_artifact_archive_dir (echo $target_artifact_path | cut -d "." -f 1-3)
+        set -l target_url https://github.com/openshift/origin/releases/download/{$target_version}/{$target_artifact_path}
+        echo "target_url $target_url"
+        curl -Lo $tmpdir/$binary_artifact $target_url
+            and tar --directory $tmpdir/untar -xf $tmpdir/$binary_artifact | true
+            and chmod +x $tmpdir/untar/{$target_artifact_archive_dir}/{$binary}
+            and mv $tmpdir/untar/{$target_artifact_archive_dir}/{$binary} ~/.local/bin/
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(execute $binary_version_cmd | head -n 1 | cut -d " " -f 2)
+        else
+            echo "$binary could not be installed, check logs"
+        end
+    end
+    rm -rf $tmpdir
+end
+
 function compose-update -d 'Update docker-compose to version provided in param or latest release if no param provided'
     set compose_version (curl -s https://api.github.com/repos/docker/compose/releases/latest | jq .tag_name | tr -d '"')
     if not test -z "$argv"
