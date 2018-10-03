@@ -219,6 +219,22 @@ function terraform-update -d 'Update terraform to latest release'
     terraform version
 end
 
+function packer-update -d 'Update packer to latest release'
+    set -l tmpdir (mktemp -d ~/tmp/tmp.packer-XXXXXXXX)
+    file $tmpdir
+    set -l target_version (curl -s https://api.github.com/repos/hashicorp/packer/tags | jq -rc '.[0] | .name' | tr -d 'v')
+    set -l target_url https://releases.hashicorp.com/packer/{$target_version}/packer_{$target_version}_linux_amd64.zip
+    echo "Target url : $target_url"
+    curl -Lo $tmpdir/packer.latest.zip https://releases.hashicorp.com/packer/{$target_version}/packer_{$target_version}_linux_amd64.zip
+    file $tmpdir/packer.latest.zip
+    cd $tmpdir
+    unzip $tmpdir/packer.latest.zip
+    chmod +x $tmpdir/packer; and mv $tmpdir/packer ~/.local/bin
+    cd ..
+    rm -rf $tmpdir
+    packer version
+end
+
 function bat-update -d 'Install latest bat release'
     # https://github.com/sharkdp/bat/releases/download/v0.6.1/bat-v0.6.1-x86_64-unknown-linux-gnu.tar.gz
     set -l binary bat
