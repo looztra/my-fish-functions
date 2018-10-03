@@ -12,12 +12,16 @@ end
 
 function aws-ops -d 'switch to zenika-ops aws env vars'
     set -x AWS_ACCESS_KEY $AWS_OPS_ACCESS_KEY_ID
+    set -x AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY
     set -x AWS_SECRET_KEY $AWS_OPS_SECRET_ACCESS_KEY
+    set -x AWS_SECRET_ACCESS_KEY $AWS_SECRET_KEY
 end
 
 function aws-training -d 'switch to zenika-training aws env vars'
     set -x AWS_ACCESS_KEY $AWS_TRAINING_ACCESS_KEY_ID
+    set -x AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY
     set -x AWS_SECRET_KEY $AWS_TRAINING_SECRET_ACCESS_KEY
+    set -x AWS_SECRET_ACCESS_KEY $AWS_SECRET_KEY
 end
 
 function docker-images-tree -d 'Print docker images in a tree representation'
