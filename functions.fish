@@ -11,17 +11,36 @@ function execute
 end
 
 function aws-ops -d 'switch to zenika-ops aws env vars'
-    set -x AWS_ACCESS_KEY $AWS_OPS_ACCESS_KEY_ID
-    set -x AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY
-    set -x AWS_SECRET_KEY $AWS_OPS_SECRET_ACCESS_KEY
-    set -x AWS_SECRET_ACCESS_KEY $AWS_SECRET_KEY
+    set -x AWS_ACCESS_KEY_ID $AWS_OPS_ACCESS_KEY_ID
+    set -x AWS_SECRET_ACCESS_KEY $AWS_OPS_SECRET_ACCESS_KEY
 end
 
 function aws-training -d 'switch to zenika-training aws env vars'
-    set -x AWS_ACCESS_KEY $AWS_TRAINING_ACCESS_KEY_ID
-    set -x AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY
-    set -x AWS_SECRET_KEY $AWS_TRAINING_SECRET_ACCESS_KEY
-    set -x AWS_SECRET_ACCESS_KEY $AWS_SECRET_KEY
+    set -x AWS_ACCESS_KEY_ID $AWS_TRAINING_ACCESS_KEY_ID
+    set -x AWS_SECRET_ACCESS_KEY $AWS_TRAINING_SECRET_ACCESS_KEY
+end
+
+function aws-alternate -d 'copy aws creds to alternate vars'
+    set -x AWS_ACCESS_KEY $AWS_ACCESS_KEY_ID
+    set -x AWS_SECRET_KEY $AWS_SECRET_ACCESS_KEY
+end
+
+function aws-env -d 'print current aws config'
+    env | grep AWS | grep -v "TRAINING" | grep -v "OPS"
+    echo
+    switch $AWS_ACCESS_KEY_ID
+    case $AWS_OPS_ACCESS_KEY_ID
+        echo "AWS_ACCESS_KEY_ID => OPS"
+    case $AWS_TRAINING_ACCESS_KEY_ID
+        echo "AWS_ACCESS_KEY_ID => TRAINING"
+    end
+    switch $AWS_SECRET_ACCESS_KEY
+    case $AWS_OPS_SECRET_ACCESS_KEY
+        echo "AWS_SECRET_ACCESS_KEY => OPS"
+    case $AWS_TRAINING_SECRET_ACCESS_KEY
+        echo "AWS_SECRET_ACCESS_KEY => TRAINING"
+    end
+
 end
 
 function docker-images-tree -d 'Print docker images in a tree representation'
