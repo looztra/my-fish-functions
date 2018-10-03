@@ -225,12 +225,10 @@ function packer-update -d 'Update packer to latest release'
     set -l target_version (curl -s https://api.github.com/repos/hashicorp/packer/tags | jq -rc '.[0] | .name' | tr -d 'v')
     set -l target_url https://releases.hashicorp.com/packer/{$target_version}/packer_{$target_version}_linux_amd64.zip
     echo "Target url : $target_url"
-    curl -Lo $tmpdir/packer.latest.zip https://releases.hashicorp.com/packer/{$target_version}/packer_{$target_version}_linux_amd64.zip
+    curl -Lo $tmpdir/packer.latest.zip $target_url
     file $tmpdir/packer.latest.zip
-    cd $tmpdir
-    unzip $tmpdir/packer.latest.zip
+    unzip -o $tmpdir/packer.latest.zip -d $tmpdir/
     chmod +x $tmpdir/packer; and mv $tmpdir/packer ~/.local/bin
-    cd ..
     rm -rf $tmpdir
     packer version
 end
@@ -352,6 +350,24 @@ function rke-update -d 'Install latest rke release'
             echo "[$binary] could not be installed, check logs"
         end
     end
+end
+
+function bats-update -d 'Update bat to latest release'
+    set -l binary bats
+    set -l binary_version_cmd $binary --version
+    set -l github_coordinates sstephenson/bats
+    set -l tmpdir (mktemp -d ~/tmp/tmp.{$binary}-XXXXXXXX)
+    file $tmpdir
+    set -l target_version (curl -s https://api.github.com/repos/{$github_coordinates}/tags | jq -rc '.[0] | .name')
+    set -l target_version_short (echo $target_version | tr -d 'v')
+    set -l target_url https://github.com/{$github_coordinates}/archive/{$target_version}.zip
+    echo "Target url : $target_url"
+    curl -Lo $tmpdir/{$binary}.latest.zip $target_url
+    file $tmpdir/{$binary}.latest.zip
+    unzip -o $tmpdir/{$binary}.latest.zip -d $tmpdir
+    execute  {$tmpdir}/{$binary}-{$target_version_short}/install.sh ~/.local
+    rm -rf $tmpdir
+    execute $binary_version_cmd
 end
 
 function clean-packagekit-cache -d 'Clean effing PackageKit cache'
