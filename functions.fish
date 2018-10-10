@@ -234,11 +234,12 @@ function machine-update -d 'Update docker-machine to version provided in param o
 end
 
 function terraform-update -d 'Update terraform to latest release'
+    set -l tmpdir (mktemp -d ~/tmp/tmp.terraform-XXXXXXXX)
+    file $tmpdir
     set tf_version (curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | jq .tag_name | tr -d '"' | tr -d 'v')
-    curl -Lo ~/tmp/terraform.latest.zip https://releases.hashicorp.com/terraform/{$tf_version}/terraform_{$tf_version}_linux_amd64.zip
-    cd ~/tmp
-    unzip ~/tmp/terraform.latest.zip
-    chmod +x ~/tmp/terraform; and mv ~/tmp/terraform ~/.local/bin
+    curl -Lo $tmpdir/terraform.latest.zip https://releases.hashicorp.com/terraform/{$tf_version}/terraform_{$tf_version}_linux_amd64.zip
+    unzip -o $tmpdir/terraform.latest.zip -d $tmpdir/
+    chmod +x $tmpdir/terraform; and mv $tmpdir/terraform ~/.local/bin; and rm -rf $tmpdir
     terraform version
 end
 
@@ -251,8 +252,7 @@ function packer-update -d 'Update packer to latest release'
     curl -Lo $tmpdir/packer.latest.zip $target_url
     file $tmpdir/packer.latest.zip
     unzip -o $tmpdir/packer.latest.zip -d $tmpdir/
-    chmod +x $tmpdir/packer; and mv $tmpdir/packer ~/.local/bin
-    rm -rf $tmpdir
+    chmod +x $tmpdir/packer; and mv $tmpdir/packer ~/.local/bin; and rm -rf $tmpdir
     packer version
 end
 
