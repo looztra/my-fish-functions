@@ -445,6 +445,47 @@ function bats-update -d 'Update bat to latest release'
     execute $binary_version_cmd
 end
 
+function kubespy-update -d 'Install latest kubespy release'
+    # https://github.com/helm/helm/releases/latest
+    # https://github.com/pulumi/kubespy/releases/download/v0.4.0/kubespy-linux-amd64.tar.gz
+    set -l binary kubespy
+    set -l binary_artifact {$binary}.tgz
+    set -l binary_version_cmd $binary version
+    set github_coordinates pulumi/kubespy
+    set -l tmpdir (mktemp -d /tmp/tmp.{$binary}-XXXXXXXX)
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (execute $binary_version_cmd)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    set -l target_artifact {$binary}-linux-amd64.tar.gz
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary_artifact} $target_url
+        and tar --directory $tmpdir -xf $tmpdir/{$binary_artifact}
+        and mv $tmpdir/releases/kubespy-linux-amd64/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(execute $binary_version_cmd)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
 function clean-packagekit-cache -d 'Clean effing PackageKit cache'
     echo "Consommation cache AVANT"
     sudo du -khs /var/cache/PackageKit/
