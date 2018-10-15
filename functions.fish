@@ -2,7 +2,7 @@ function execute
     if test (count $argv) -eq 0
         return 0
     end
-    if which $argv[1] > /dev/null
+    if which $argv[1] >/dev/null
         eval $argv
         return $status
     else
@@ -29,16 +29,16 @@ function aws-env -d 'print current aws config'
     env | grep AWS | grep -v "TRAINING" | grep -v "OPS"
     echo
     switch $AWS_ACCESS_KEY_ID
-    case $AWS_OPS_ACCESS_KEY_ID
-        echo "AWS_ACCESS_KEY_ID => OPS"
-    case $AWS_TRAINING_ACCESS_KEY_ID
-        echo "AWS_ACCESS_KEY_ID => TRAINING"
+        case $AWS_OPS_ACCESS_KEY_ID
+            echo "AWS_ACCESS_KEY_ID => OPS"
+        case $AWS_TRAINING_ACCESS_KEY_ID
+            echo "AWS_ACCESS_KEY_ID => TRAINING"
     end
     switch $AWS_SECRET_ACCESS_KEY
-    case $AWS_OPS_SECRET_ACCESS_KEY
-        echo "AWS_SECRET_ACCESS_KEY => OPS"
-    case $AWS_TRAINING_SECRET_ACCESS_KEY
-        echo "AWS_SECRET_ACCESS_KEY => TRAINING"
+        case $AWS_OPS_SECRET_ACCESS_KEY
+            echo "AWS_SECRET_ACCESS_KEY => OPS"
+        case $AWS_TRAINING_SECRET_ACCESS_KEY
+            echo "AWS_SECRET_ACCESS_KEY => TRAINING"
     end
 
 end
@@ -64,7 +64,7 @@ function docker-clean-dangling-images -d 'Remove dangling images'
 end
 
 function minikube-update -d 'Install latest minikube release'
-    execute minikube version > /dev/null ^ /dev/null
+    execute minikube version >/dev/null ^/dev/null
     if test $status -eq 0
         set current_version (minikube version | cut -d " " -f 3)
         echo "Current version $current_version"
@@ -74,14 +74,16 @@ function minikube-update -d 'Install latest minikube release'
     end
     set target_version (curl -s https://api.github.com/repos/kubernetes/minikube/releases/latest | jq .tag_name | tr -d '"')
     if not test -z "$argv"
-      set target_version $argv
+        set target_version $argv
     end
     if [ $target_version = $current_version ]
         echo "Current version is already target/latest"
     else
         echo "Current version is not target/latest ($target_version), downloading..."
-        curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/{$target_version}/minikube-linux-amd64 ; and chmod +x minikube ; and mv minikube ~/.local/bin/
-        execute minikube version > /dev/null ^ /dev/null
+        curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/{$target_version}/minikube-linux-amd64
+        and chmod +x minikube
+        and mv minikube ~/.local/bin/
+        execute minikube version >/dev/null ^/dev/null
         if test $status -eq 0
             echo "Installed version "(minikube version | cut -d " " -f 3)
         else
@@ -91,7 +93,7 @@ function minikube-update -d 'Install latest minikube release'
 end
 
 function minishift-update -d 'Install latest minishift release'
-    execute minishift version > /dev/null ^ /dev/null
+    execute minishift version >/dev/null ^/dev/null
     if test $status -eq 0
         set current_version (minishift version | cut -d "+" -f 1 | cut -d " " -f 2)
         echo "Current version $current_version"
@@ -101,19 +103,19 @@ function minishift-update -d 'Install latest minishift release'
     end
     set target_version (curl -s https://api.github.com/repos/minishift/minishift/releases/latest | jq .tag_name | tr -d '"')
     if not test -z "$argv"
-      set target_version $argv
+        set target_version $argv
     end
     if [ $target_version = $current_version ]
         echo "Current version is already target/latest"
     else
         echo "Current version is not target/latest ($target_version), downloading..."
         set target_version_short (echo $target_version | tr -d "v")
-        curl -Lo $HOME/tmp/minishift.tgz https://github.com/minishift/minishift/releases/download/{$target_version}/minishift-{$target_version_short}-linux-amd64.tgz ; \
-            and tar --directory $HOME/tmp -xf $HOME/tmp/minishift.tgz ; \
-            and chmod +x $HOME/tmp/minishift-{$target_version_short}-linux-amd64/minishift
-            and mv $HOME/tmp/minishift-{$target_version_short}-linux-amd64/minishift ~/.local/bin/ ; \
-            and rm -rf $HOME/tmp/minishift-{$target_version_short}-linux-amd64 $HOME/tmp/minishift.tgz
-        execute minishift version > /dev/null ^ /dev/null
+        curl -Lo $HOME/tmp/minishift.tgz https://github.com/minishift/minishift/releases/download/{$target_version}/minishift-{$target_version_short}-linux-amd64.tgz
+        and tar --directory $HOME/tmp -xf $HOME/tmp/minishift.tgz
+        and chmod +x $HOME/tmp/minishift-{$target_version_short}-linux-amd64/minishift
+        and mv $HOME/tmp/minishift-{$target_version_short}-linux-amd64/minishift ~/.local/bin/
+        and rm -rf $HOME/tmp/minishift-{$target_version_short}-linux-amd64 $HOME/tmp/minishift.tgz
+        execute minishift version >/dev/null ^/dev/null
         if test $status -eq 0
             echo "Installed version "(minishift version | cut -d "+" -f 1 | cut -d " " -f 2)
         else
@@ -129,9 +131,9 @@ function kubectl-update -d 'Update kubectl to latest release'
     set -l binary_version_cmd $binary version --client --short
     set -l version_url https://storage.googleapis.com/kubernetes-release/release/stable.txt
     function compute_artifact_url
-      set -l t_version $argv[1]
-      set -l t_artifact $argv[2]
-      printf "https://storage.googleapis.com/kubernetes-release/release/$t_version/bin/linux/amd64/$t_artifact"
+        set -l t_version $argv[1]
+        set -l t_artifact $argv[2]
+        printf "https://storage.googleapis.com/kubernetes-release/release/$t_version/bin/linux/amd64/$t_artifact"
     end
     #
     execute $binary_version_cmd >/dev/null ^/dev/null
@@ -192,9 +194,9 @@ function oc-update -d 'Update oc to latest release'
         set -l target_url https://github.com/openshift/origin/releases/download/{$target_version}/{$target_artifact_path}
         echo "target_url $target_url"
         curl -Lo $tmpdir/$binary_artifact $target_url
-            and tar --directory $tmpdir/untar -xf $tmpdir/$binary_artifact | true
-            and chmod +x $tmpdir/untar/{$target_artifact_archive_dir}/{$binary}
-            and mv $tmpdir/untar/{$target_artifact_archive_dir}/{$binary} ~/.local/bin/
+        and tar --directory $tmpdir/untar -xf $tmpdir/$binary_artifact | true
+        and chmod +x $tmpdir/untar/{$target_artifact_archive_dir}/{$binary}
+        and mv $tmpdir/untar/{$target_artifact_archive_dir}/{$binary} ~/.local/bin/
         execute $binary_version_cmd >/dev/null ^/dev/null
         if test $status -eq 0
             echo "Installed version "(execute $binary_version_cmd | head -n 1 | cut -d " " -f 2)
@@ -207,30 +209,35 @@ end
 
 function compose-update -d 'Update docker-compose to version provided in param or latest release if no param provided'
     set compose_version (curl -s https://api.github.com/repos/docker/compose/releases/latest | jq .tag_name | tr -d '"')
+    set -l tmpdir (mktemp -d)
     if not test -z "$argv"
-      set compose_version $argv
+        set compose_version $argv
     end
     echo "Retreiving docker-compose version $compose_version"
     echo "gna"
-    curl -Lo ~/tmp/docker-compose https://github.com/docker/compose/releases/download/$compose_version/docker-compose-Linux-x86_64
-    chmod +x ~/tmp/docker-compose ; and mv ~/tmp/docker-compose ~/.local/bin/
+    curl -Lo {$tmpdir}/docker-compose https://github.com/docker/compose/releases/download/$compose_version/docker-compose-Linux-x86_64
+    chmod +x {$tmpdir}/docker-compose
+    and mv {$tmpdir}/docker-compose ~/.local/bin/
     which docker-compose
     docker-compose version
+    rm -rf $tmpdir
 end
 
 function machine-update -d 'Update docker-machine to version provided in param or latest release if no param provided'
     set machine_version (curl -s https://api.github.com/repos/docker/machine/releases/latest | jq .tag_name | tr -d '"')
+    set -l tmpdir (mktemp -d)
     set version_type default
     if not test -z "$argv"
-      set version_type forced
-      set machine_version $argv
+        set version_type forced
+        set machine_version $argv
     end
     echo "Retreiving docker-machine version $machine_version ($version_type)"
-    rm -f ~/tmp/docker-machine
-    curl -Lo ~/tmp/docker-machine https://github.com/docker/machine/releases/download/$machine_version/docker-machine-Linux-x86_64
-    chmod +x ~/tmp/docker-machine ; and mv ~/tmp/docker-machine ~/.local/bin/
+    curl -Lo {$tmpdir}/docker-machine https://github.com/docker/machine/releases/download/$machine_version/docker-machine-Linux-x86_64
+    chmod +x {$tmpdir}/docker-machine
+    and mv {$tmpdir}/docker-machine ~/.local/bin/
     which docker-machine
     docker-machine version
+    rm -rf $tmpdir
 end
 
 function terraform-update -d 'Update terraform to latest release'
@@ -239,7 +246,9 @@ function terraform-update -d 'Update terraform to latest release'
     set tf_version (curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | jq .tag_name | tr -d '"' | tr -d 'v')
     curl -Lo $tmpdir/terraform.latest.zip https://releases.hashicorp.com/terraform/{$tf_version}/terraform_{$tf_version}_linux_amd64.zip
     unzip -o $tmpdir/terraform.latest.zip -d $tmpdir/
-    chmod +x $tmpdir/terraform; and mv $tmpdir/terraform ~/.local/bin; and rm -rf $tmpdir
+    chmod +x $tmpdir/terraform
+    and mv $tmpdir/terraform ~/.local/bin
+    and rm -rf $tmpdir
     terraform version
 end
 
@@ -252,7 +261,9 @@ function packer-update -d 'Update packer to latest release'
     curl -Lo $tmpdir/packer.latest.zip $target_url
     file $tmpdir/packer.latest.zip
     unzip -o $tmpdir/packer.latest.zip -d $tmpdir/
-    chmod +x $tmpdir/packer; and mv $tmpdir/packer ~/.local/bin; and rm -rf $tmpdir
+    chmod +x $tmpdir/packer
+    and mv $tmpdir/packer ~/.local/bin
+    and rm -rf $tmpdir
     packer version
 end
 
@@ -264,7 +275,7 @@ function bat-update -d 'Install latest bat release'
     set github_coordinates sharkdp/bat
     set -l tmpdir (mktemp -d)
     mkdir -p $tmpdir/untar
-    execute $binary_version_cmd > /dev/null ^ /dev/null
+    execute $binary_version_cmd >/dev/null ^/dev/null
     if test $status -eq 0
         set current_version v(execute $binary_version_cmd | cut -d " " -f 2)
         echo "Current version $current_version"
@@ -274,7 +285,7 @@ function bat-update -d 'Install latest bat release'
     end
     set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
     if not test -z "$argv"
-      set target_version $argv
+        set target_version $argv
     end
     set -l target_artifact {$binary}-{$target_version}-x86_64-unknown-linux-gnu.tar.gz
     if [ $target_version = $current_version ]
@@ -282,11 +293,11 @@ function bat-update -d 'Install latest bat release'
     else
         echo "Current version is not target/latest ($target_version), downloading..."
         set target_version_short (echo $target_version | tr -d "v")
-        curl -Lo $tmpdir/{$binary_artifact} https://github.com/{$github_coordinates}/releases/download/{$target_version}/bat-{$target_version}-x86_64-unknown-linux-gnu.tar.gz ; \
-            and tar --directory $tmpdir/untar -xf $tmpdir/{$binary_artifact} ; \
-            and mv $tmpdir/untar/bat-{$target_version}-x86_64-unknown-linux-gnu/{$binary} ~/.local/bin/ ; \
-            and rm -rf $tmpdir
-        execute $binary_version_cmd > /dev/null ^ /dev/null
+        curl -Lo $tmpdir/{$binary_artifact} https://github.com/{$github_coordinates}/releases/download/{$target_version}/bat-{$target_version}-x86_64-unknown-linux-gnu.tar.gz
+        and tar --directory $tmpdir/untar -xf $tmpdir/{$binary_artifact}
+        and mv $tmpdir/untar/bat-{$target_version}-x86_64-unknown-linux-gnu/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
         if test $status -eq 0
             echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 2)
         else
@@ -302,7 +313,7 @@ function stern-update -d 'Install latest stern release'
     set -l binary_version_cmd $binary --version
     set github_coordinates wercker/stern
     set -l tmpdir (mktemp -d)
-    execute $binary_version_cmd > /dev/null ^ /dev/null
+    execute $binary_version_cmd >/dev/null ^/dev/null
     if test $status -eq 0
         set current_version (execute $binary_version_cmd | cut -d " " -f 3)
         echo "Current version $current_version"
@@ -312,7 +323,7 @@ function stern-update -d 'Install latest stern release'
     end
     set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
     if not test -z "$argv"
-      set target_version $argv
+        set target_version $argv
     end
     set -l target_artifact {$binary}_linux_amd64
     if [ $target_version = $current_version ]
@@ -322,11 +333,11 @@ function stern-update -d 'Install latest stern release'
         set target_version_short (echo $target_version | tr -d "v")
         set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
         echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary_artifact} $target_url; \
-            and chmod +x $tmpdir/{$binary} ; \
-            and mv $tmpdir/{$binary} ~/.local/bin/ ; \
-            and rm -rf $tmpdir
-        execute $binary_version_cmd > /dev/null ^ /dev/null
+        curl -Lo $tmpdir/{$binary_artifact} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
         if test $status -eq 0
             echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 3)
         else
@@ -342,7 +353,7 @@ function rke-update -d 'Install latest rke release'
     set -l binary_version_cmd $binary --version
     set github_coordinates rancher/rke
     set -l tmpdir (mktemp -d)
-    execute $binary_version_cmd > /dev/null ^ /dev/null
+    execute $binary_version_cmd >/dev/null ^/dev/null
     if test $status -eq 0
         set current_version (execute $binary_version_cmd | cut -d " " -f 3)
         echo "Current version $current_version"
@@ -352,7 +363,7 @@ function rke-update -d 'Install latest rke release'
     end
     set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
     if not test -z "$argv"
-      set target_version $argv
+        set target_version $argv
     end
     set -l target_artifact {$binary}_linux-amd64
     if [ $target_version = $current_version ]
@@ -362,11 +373,11 @@ function rke-update -d 'Install latest rke release'
         set target_version_short (echo $target_version | tr -d "v")
         set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
         echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary_artifact} $target_url; \
-            and chmod +x $tmpdir/{$binary} ; \
-            and mv $tmpdir/{$binary} ~/.local/bin/ ; \
-            and rm -rf $tmpdir
-        execute $binary_version_cmd > /dev/null ^ /dev/null
+        curl -Lo $tmpdir/{$binary_artifact} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
         if test $status -eq 0
             echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 3)
         else
@@ -388,7 +399,7 @@ function bats-update -d 'Update bat to latest release'
     curl -Lo $tmpdir/{$binary}.latest.zip $target_url
     file $tmpdir/{$binary}.latest.zip
     unzip -o $tmpdir/{$binary}.latest.zip -d $tmpdir
-    execute  {$tmpdir}/{$binary}-{$target_version_short}/install.sh ~/.local
+    execute {$tmpdir}/{$binary}-{$target_version_short}/install.sh ~/.local
     rm -rf $tmpdir
     execute $binary_version_cmd
 end
