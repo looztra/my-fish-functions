@@ -40,7 +40,49 @@ function aws-env -d 'print current aws config'
         case $AWS_TRAINING_SECRET_ACCESS_KEY
             echo "AWS_SECRET_ACCESS_KEY => TRAINING"
     end
+end
 
+function dep-update -d 'Install latest dep release'
+    # https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64
+    set -l binary dep
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates golang/dep
+    set -l target_artifact {$binary}-linux-amd64
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+        dep version | grep version | grep -v "go" | sed "s/  *//g" | cut -d ":" -f2
+    end
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
 end
 
 function docker-images-tree -d 'Print docker images in a tree representation'
