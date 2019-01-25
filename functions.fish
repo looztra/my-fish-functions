@@ -10,79 +10,9 @@ function execute
     end
 end
 
-function aws-ops -d 'switch to zenika-ops aws env vars'
-    set -x AWS_ACCESS_KEY_ID $AWS_OPS_ACCESS_KEY_ID
-    set -x AWS_SECRET_ACCESS_KEY $AWS_OPS_SECRET_ACCESS_KEY
-end
-
-function aws-training -d 'switch to zenika-training aws env vars'
-    set -x AWS_ACCESS_KEY_ID $AWS_TRAINING_ACCESS_KEY_ID
-    set -x AWS_SECRET_ACCESS_KEY $AWS_TRAINING_SECRET_ACCESS_KEY
-end
-
 function aws-alternate -d 'copy aws creds to alternate vars'
     set -x AWS_ACCESS_KEY $AWS_ACCESS_KEY_ID
     set -x AWS_SECRET_KEY $AWS_SECRET_ACCESS_KEY
-end
-
-function aws-env -d 'print current aws config'
-    env | grep AWS | grep -v "TRAINING" | grep -v "OPS"
-    echo
-    switch $AWS_ACCESS_KEY_ID
-        case $AWS_OPS_ACCESS_KEY_ID
-            echo "AWS_ACCESS_KEY_ID => OPS"
-        case $AWS_TRAINING_ACCESS_KEY_ID
-            echo "AWS_ACCESS_KEY_ID => TRAINING"
-    end
-    switch $AWS_SECRET_ACCESS_KEY
-        case $AWS_OPS_SECRET_ACCESS_KEY
-            echo "AWS_SECRET_ACCESS_KEY => OPS"
-        case $AWS_TRAINING_SECRET_ACCESS_KEY
-            echo "AWS_SECRET_ACCESS_KEY => TRAINING"
-    end
-end
-
-function dep-update -d 'Install latest dep release'
-    # https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64
-    set -l binary dep
-    set -l binary_version_cmd $binary version
-    set -l github_coordinates golang/dep
-    set -l target_artifact {$binary}-linux-amd64
-    set -l tmpdir (mktemp -d)
-
-    function compute_version
-        dep version | grep version | grep -v "go" | sed "s/  *//g" | cut -d ":" -f2
-    end
-    execute $binary_version_cmd >/dev/null ^/dev/null
-    if test $status -eq 0
-        set current_version (compute_version)
-        echo "Current version $current_version"
-    else
-        set current_version ""
-        echo "[$binary] is not installed yet"
-    end
-    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
-    if not test -z "$argv"
-        set target_version $argv
-    end
-    if [ $target_version = $current_version ]
-        echo "Current version is already target/latest"
-    else
-        echo "Current version is not target/latest ($target_version), downloading..."
-        set target_version_short (echo $target_version | tr -d "v")
-        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
-        echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary} $target_url
-        and chmod +x $tmpdir/{$binary}
-        and mv $tmpdir/{$binary} ~/.local/bin/
-        and rm -rf $tmpdir
-        execute $binary_version_cmd >/dev/null ^/dev/null
-        if test $status -eq 0
-            echo "Installed version "(compute_version)
-        else
-            echo "[$binary] could not be installed, check logs"
-        end
-    end
 end
 
 function docker-images-tree -d 'Print docker images in a tree representation'
@@ -525,6 +455,55 @@ function kubespy-update -d 'Install latest kubespy release'
         else
             echo "[$binary] could not be installed, check logs"
         end
+    end
+end
+
+function dep-update -d 'Install latest dep release'
+    # https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64
+    set -l binary dep
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates golang/dep
+    set -l target_artifact {$binary}-linux-amd64
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+        dep version | grep version | grep -v "go" | sed "s/  *//g" | cut -d ":" -f2
+    end
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
+function list-updaters -d 'List available installers/updaters'
+    for tool in minikube minishift kubectl oc compose machine terraform packer bat stern rke bats kubespy dep
+        echo "$tool-update"
     end
 end
 
