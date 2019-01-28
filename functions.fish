@@ -501,8 +501,23 @@ function dep-update -d 'Install latest dep release'
     end
 end
 
+function vault-update -d 'Update vault to latest release'
+    set -l tmpdir (mktemp -d ~/tmp/tmp.vault-XXXXXXXX)
+    file $tmpdir
+    set -l target_version (curl -s https://api.github.com/repos/hashicorp/vault/tags | jq -rc '.[0] | .name' | tr -d 'v')
+    set -l target_url https://releases.hashicorp.com/vault/{$target_version}/vault_{$target_version}_linux_amd64.zip
+    echo "Target url : $target_url"
+    curl -Lo $tmpdir/vault.latest.zip $target_url
+    file $tmpdir/vault.latest.zip
+    unzip -o $tmpdir/vault.latest.zip -d $tmpdir/
+    chmod +x $tmpdir/vault
+    and mv $tmpdir/vault ~/.local/bin
+    and rm -rf $tmpdir
+    vault version
+end
+
 function list-updaters -d 'List available installers/updaters'
-    for tool in minikube minishift kubectl oc compose machine terraform packer bat stern rke bats kubespy dep
+    for tool in minikube minishift kubectl oc compose machine terraform packer bat stern rke bats kubespy dep vault
         echo "$tool-update"
     end
 end
