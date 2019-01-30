@@ -45,6 +45,10 @@ function gitc -d 'Clone a git repository and prefix the local directory with the
     set -l git_repository_url $argv[1]
     set -l target_base_dir $argv[2]
     set -l path_elements (string split / $git_repository_url)
+    set -l owner_elements (string split : $path_elements[-2])
+    set -l repo_elements (string split . $path_elements[-1])
+    set -l owner $owner_elements[-1]
+    set -l repo $repo_elements[1]
     set -l target_dir
     if test -z "$target_base_dir"
         set target_base_dir "."
@@ -54,7 +58,7 @@ function gitc -d 'Clone a git repository and prefix the local directory with the
             return 1
         end
     end
-    set -l target_dir "$target_base_dir/$path_elements[-2]--$path_elements[-1]"
+    set -l target_dir "$target_base_dir/$owner--$repo"
     if test -e $target_dir
         echo "Cannot clone git repository [$git_repository_url] to directory [$target_dir] because file/directory already exist"
         return 1
