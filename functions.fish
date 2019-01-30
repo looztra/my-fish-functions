@@ -34,6 +34,49 @@ end
 function docker-clean-dangling-images -d 'Remove dangling images'
     docker rmi (docker images --filter dangling=true --quiet)
 end
+#
+# Usefull
+#
+function gitc -d 'Clone a git repository and prefix the local directory with the owner'
+    if test -z "$argv"
+        echo "Waiting for params that are not provided, bye"
+        return 1
+    end
+    set -l git_repository_url $argv[1]
+    set -l target_base_dir $argv[2]
+    set -l path_elements (string split / $git_repository_url)
+    set -l target_dir
+    if test -z "$target_base_dir"
+        set target_base_dir "."
+    else
+        if not test -d $target_base_dir
+            echo "Target base [$target_base_dir] dir doesn't seem to exist, bye"
+            return 1
+        end
+    end
+    set -l target_dir "$target_base_dir/$path_elements[-2]--$path_elements[-1]"
+    if test -e $target_dir
+        echo "Cannot clone git repository [$git_repository_url] to directory [$target_dir] because file/directory already exist"
+        return 1
+    end
+    echo "Cloning repo [$git_repository_url] » [$target_dir]"
+    git clone $git_repository_url $target_dir
+end
+
+function gitct -d 'Clone a git repository, prefix the local dir with owner, and force target base dir'
+    set -l git_repository_url $argv[1]
+    set -l target_base_dir $argv[2]
+    set -l workspace_base_dir ~/workspace
+    if test -z $target_base_dir
+        echo "No target base dir provided, falling back to 'gitc'"
+        gitc $git_repository_url
+    else
+        gitc $git_repository_url $workspace_base_dir/$target_base_dir
+    end
+end
+#
+# Installers / Updaters
+#
 
 function minikube-update -d 'Install latest minikube release'
     execute minikube version >/dev/null ^/dev/null
