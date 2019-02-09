@@ -606,6 +606,24 @@ function vault-update -d 'Update vault to latest release'
     vault version
 end
 
+function k9s-update -d 'Update k9s to latest release'
+    # https://github.com/derailed/k9s/releases/download/0.1.2/k9s_0.1.2_Linux_x86_64.tar.gz
+    set -l tmpdir (mktemp -d ~/tmp/tmp.k9s-XXXXXXXX)
+    set -l github_coordinates derailed/k9s
+    set -l binary k9s
+    file $tmpdir
+    set -l target_version (curl -s https://api.github.com/repos/{$github_coordinates}/tags | jq -rc '.[0] | .name')
+    set -l target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$binary}_{$target_version}_Linux_x86_64.tar.gz
+    echo "Target url : $target_url"
+    curl -Lo $tmpdir/$binary.tgz $target_url
+    file $tmpdir/$binary.tgz
+    tar --directory $tmpdir -xf $tmpdir/$binary.tgz
+    chmod +x $tmpdir/{$binary}
+    mv $tmpdir/{$binary} ~/.local/bin/
+    rm -rf $tmpdir
+    k9s version
+end
+
 function list-updaters -d 'List available installers/updaters'
     for tool in minikube\
                 minishift\
