@@ -640,7 +640,8 @@ function list-updaters -d 'List available installers/updaters'
                 kubespy\
                 dep\
                 vault\
-                terraform-docs
+                terraform-docs \
+                k9s
         echo "$tool-update"
     end
 end
