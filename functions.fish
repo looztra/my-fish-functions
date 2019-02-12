@@ -714,12 +714,12 @@ end
 function krew-update -d 'Install latest krew release'
     # https://storage.googleapis.com/krew/v0.2.1/krew.tar.gz
     set -l binary krew
-    set -l binary_version_cmd $binary version
+    set -l binary_version_cmd kubectl-{$binary} version
     set -l github_coordinates GoogleContainerTools/krew
     set -l tmpdir (mktemp -d)
 
     function compute_version
-      krew version  | grep GitTag | cut -d "v" -f2
+      kubectl-krew version  | grep GitTag | cut -d "v" -f2
     end
     execute $binary_version_cmd >/dev/null ^/dev/null
     if test $status -eq 0
@@ -743,7 +743,7 @@ function krew-update -d 'Install latest krew release'
         echo "Downloading from $target_url"
         curl -Lo $tmpdir/{$binary}.tgz $target_url
         and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
-        and mv $tmpdir/{$binary}-linux_amd64 ~/.local/bin/{$binary}
+        and mv $tmpdir/{$binary}-linux_amd64 ~/.local/bin/kubectl-{$binary}
         and rm -rf $tmpdir
         execute $binary_version_cmd >/dev/null ^/dev/null
         if test $status -eq 0
