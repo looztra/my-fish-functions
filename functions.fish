@@ -773,7 +773,8 @@ function list-updaters -d 'List available installers/updaters'
  terraform-docs\
  k9s\
  rbac-lookup \
- kustomize
+ kustomize \
+ krew-update
         echo "$tool-update"
     end
 end
