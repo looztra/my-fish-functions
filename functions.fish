@@ -711,6 +711,49 @@ function kustomize-update -d 'Install latest kustomize release'
     end
 end
 
+function krew-update -d 'Install latest krew release'
+    # https://storage.googleapis.com/krew/v0.2.1/krew.tar.gz
+    set -l binary krew
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates GoogleContainerTools/krew
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+      krew version  | grep GitTag | cut -d "v" -f2
+    end
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
+    set target_version_short (echo $target_version | tr -d "v")
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version_short = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        set -l target_artifact {$binary}.tar.gz
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_url https://storage.googleapis.com/{$binary}/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary}.tgz $target_url
+        and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
+        and mv $tmpdir/{$binary}-linux_amd64 ~/.local/bin/{$binary}
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
 function list-updaters -d 'List available installers/updaters'
     for tool in minikube\
  minishift\
