@@ -624,24 +624,69 @@ function k9s-update -d 'Update k9s to latest release'
     k9s version
 end
 
+function rbac-lookup-update -d 'Install latest rbac-lookup release'
+    # https://github.com/reactiveops/rbac-lookup/releases/download/v0.2.1/rbac-lookup_0.2.1_Linux_x86_64.tar.gz
+    set -l binary rbac-lookup
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates reactiveops/rbac-lookup
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+        rbac-lookup version | cut -d " " -f 3
+    end
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
+    set target_version_short (echo $target_version | tr -d "v")
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version_short = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        set -l target_artifact {$binary}_{$target_version_short}_Linux_x86_64.tar.gz
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary}.tgz $target_url
+        and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
 function list-updaters -d 'List available installers/updaters'
     for tool in minikube\
-                minishift\
-                kubectl\
-                oc\
-                compose\
-                machine\
-                terraform\
-                packer\
-                bat\
-                stern\
-                rke\
-                bats\
-                kubespy\
-                dep\
-                vault\
-                terraform-docs \
-                k9s
+ minishift\
+ kubectl\
+ oc\
+ compose\
+ machine\
+ terraform\
+ packer\
+ bat\
+ stern\
+ rke\
+ bats\
+ kubespy\
+ dep\
+ vault\
+ terraform-docs\
+ k9s\
+ rbac-lookup
         echo "$tool-update"
     end
 end
