@@ -668,6 +668,49 @@ function rbac-lookup-update -d 'Install latest rbac-lookup release'
     end
 end
 
+function kustomize-update -d 'Install latest kustomize release'
+    # https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.1/kustomize_2.0.1_linux_amd64
+    set -l binary kustomize
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates kubernetes-sigs/kustomize
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+        kustomize version  | cut -d ":" -f3 | cut -d " " -f1
+    end
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
+    set target_version_short (echo $target_version | tr -d "v")
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version_short = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        set -l target_artifact {$binary}_{$target_version_short}_linux_amd64
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
 function list-updaters -d 'List available installers/updaters'
     for tool in minikube\
  minishift\
@@ -686,7 +729,8 @@ function list-updaters -d 'List available installers/updaters'
  vault\
  terraform-docs\
  k9s\
- rbac-lookup
+ rbac-lookup \
+ kustomize
         echo "$tool-update"
     end
 end
