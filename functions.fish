@@ -37,6 +37,9 @@ end
 #
 # Usefull
 #
+function github_api_status -d 'Get github api status and quota'
+    curl -u "looztra:$GITHUB_TOKEN" -i https://api.github.com/users/looztra
+end
 function gitc -d 'Clone a git repository and prefix the local directory with the owner'
     if test -z "$argv"
         echo "Waiting for params that are not provided, bye"
@@ -90,6 +93,66 @@ function compute_target_url -d "github style compute_target_url"
     set -l l_target_version_short $argv[3]
     set -l l_target_artifact $argv[4]
     printf https://github.com/$l_github_coordinates/releases/download/$l_target_version/$l_target_artifact
+end
+function create_temp_dir -d "create tmp download dir according to pattern"
+    set -l l_pattern $argv[1]
+    set -l l_base_dir /tmp/awesome-updater
+    mkdir -p $l_base_dir
+    printf (mktemp -d $l_base_dir/$l_pattern.XXXXXXXXX)
+end
+function download_and_install
+    set -l target_url $argv[1]
+    set -l tmpdir $argv[2]
+    set -l binary $argv[3]
+    echo "Nothing here for now"
+end
+
+function download_and_untar_and_install
+    set -l target_url $argv[1]
+    set -l tmpdir $argv[2]
+    set -l binary $argv[3]
+    echo "Downloading from $target_url"
+    curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary}.tgz $target_url
+    and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
+    and mv $tmpdir/{$binary} ~/.local/bin/{$binary}
+end
+
+function _generic_update -d 'Generic updater'
+    set -l binary $argv[1]
+    set -l github_coordinates $argv[2]
+    set -l binary_version_cmd $argv[3..-1]
+    #
+    printf "binary : [$binary]\ngithub_coordinates : [$github_coordinates]\nbinary_version_cmd : [$binary_version_cmd]\n"
+    #
+    set -l tmpdir (create_temp_dir $binary)
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (compute_latest_version $github_coordinates)
+    set target_version_short (echo $target_version | tr -d "v")
+    printf "Found target_version [$target_version]\nFound target_version_short [$target_version_short]\n"
+    if [ $target_version_short = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        set -l target_artifact (compute_target_artifact $binary)
+        echo "Found target_artifact [$target_artifact]"
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set -l target_url (compute_target_url $github_coordinates $target_version $target_version_short $target_artifact)
+        #
+        download_and_install $target_url $tmpdir $binary
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
 end
 #
 # Installers / Updaters
@@ -769,9 +832,8 @@ end
 function kubeval-update -d 'Install latest kubeval release'
     # https://github.com/garethr/kubeval/releases/download/0.7.3/kubeval-linux-amd64.tar.gz
     set -l binary kubeval
-    set -l binary_version_cmd {$binary} --version
-    set -l github_coordinates garethr/kubeval
-    set -l tmpdir (mktemp -d)
+    set -l github_coordinates garethr/$binary
+    set -l binary_version_cmd $binary --version
 
     function compute_version
         kubeval --version | grep Version | cut -d ":" -f2 | tr -d " "
@@ -782,37 +844,16 @@ function kubeval-update -d 'Install latest kubeval release'
         set -l l_target_version_short $argv[3]
         printf $l_binary"-linux-amd64.tar.gz"
     end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        download_and_untar_and_install $target_url $tmpdir $binary
+    end
+    #
     # Nothing more to customize down here (crossing fingers)
-    execute $binary_version_cmd >/dev/null ^/dev/null
-    if test $status -eq 0
-        set current_version (compute_version)
-        echo "Current version $current_version"
-    else
-        set current_version ""
-        echo "[$binary] is not installed yet"
-    end
-    set target_version (compute_latest_version $github_coordinates)
-    set target_version_short (echo $target_version | tr -d "v")
-    printf "Found target_version [$target_version]\nFound target_version_short [$target_version_short]\n"
-    if [ $target_version_short = $current_version ]
-        echo "Current version is already target/latest"
-    else
-        set -l target_artifact (compute_target_artifact $binary)
-        echo "Found target_artifact [$target_artifact]"
-        echo "Current version is not target/latest ($target_version), downloading..."
-        set -l target_url (compute_target_url $github_coordinates $target_version $target_version_short $target_artifact)
-        echo "Downloading from $target_url"
-        curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary}.tgz $target_url
-        and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
-        and mv $tmpdir/{$binary} ~/.local/bin/{$binary}
-        and rm -rf $tmpdir
-        execute $binary_version_cmd >/dev/null ^/dev/null
-        if test $status -eq 0
-            echo "Installed version "(compute_version)
-        else
-            echo "[$binary] could not be installed, check logs"
-        end
-    end
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
 end
 
 function list-updaters -d 'List available installers/updaters'
