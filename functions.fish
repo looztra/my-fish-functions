@@ -764,6 +764,24 @@ function kubeval-update -d 'Install latest kubeval release'
     function compute_version
         kubeval --version | grep Version | cut -d ":" -f2 | tr -d " "
     end
+    function compute_latest_version
+        set -l l_github_coordinates $argv[1]
+        printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$l_github_coordinates/releases/latest | jq -r '.tag_name')
+    end
+    function compute_target_artifact
+        set -l l_binary $argv[1]
+        set -l l_target_version $argv[2]
+        set -l l_target_version_short $argv[3]
+        printf $l_binary"-linux-amd64.tar.gz"
+    end
+    function compute_target_url
+        set -l l_github_coordinates $argv[1]
+        set -l l_target_version $argv[2]
+        set -l l_target_version_short $argv[3]
+        set -l l_target_artifact $argv[4]
+        printf https://github.com/$l_github_coordinates/releases/download/$l_target_version/$l_target_artifact
+    end
+    # Nothing more to customize down here (crossing fingers)
     execute $binary_version_cmd >/dev/null ^/dev/null
     if test $status -eq 0
         set current_version (compute_version)
@@ -772,19 +790,18 @@ function kubeval-update -d 'Install latest kubeval release'
         set current_version ""
         echo "[$binary] is not installed yet"
     end
-    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
+    set target_version (compute_latest_version $github_coordinates)
     set target_version_short (echo $target_version | tr -d "v")
-    if not test -z "$argv"
-        set target_version $argv
-    end
+    printf "Found target_version [$target_version]\nFound target_version_short [$target_version_short]\n"
     if [ $target_version_short = $current_version ]
         echo "Current version is already target/latest"
     else
-        set -l target_artifact {$binary}-linux-amd64.tar.gz
+        set -l target_artifact (compute_target_artifact $binary)
+        echo "Found target_artifact [$target_artifact]"
         echo "Current version is not target/latest ($target_version), downloading..."
-        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version_short}/{$target_artifact}
+        set -l target_url (compute_target_url $github_coordinates $target_version $target_version_short $target_artifact)
         echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary}.tgz $target_url
+        curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary}.tgz $target_url
         and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
         and mv $tmpdir/{$binary} ~/.local/bin/{$binary}
         and rm -rf $tmpdir
