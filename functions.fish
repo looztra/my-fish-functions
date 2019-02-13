@@ -79,9 +79,21 @@ function gitct -d 'Clone a git repository, prefix the local dir with owner, and 
     end
 end
 #
+# Installers / Updaters shared functions
+function compute_latest_version -d "github style compute_latest_version"
+    set -l l_github_coordinates $argv[1]
+    printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$l_github_coordinates/releases/latest | jq -r '.tag_name')
+end
+function compute_target_url -d "github style compute_target_url"
+    set -l l_github_coordinates $argv[1]
+    set -l l_target_version $argv[2]
+    set -l l_target_version_short $argv[3]
+    set -l l_target_artifact $argv[4]
+    printf https://github.com/$l_github_coordinates/releases/download/$l_target_version/$l_target_artifact
+end
+#
 # Installers / Updaters
 #
-
 function minikube-update -d 'Install latest minikube release'
     execute minikube version >/dev/null ^/dev/null
     if test $status -eq 0
@@ -764,22 +776,11 @@ function kubeval-update -d 'Install latest kubeval release'
     function compute_version
         kubeval --version | grep Version | cut -d ":" -f2 | tr -d " "
     end
-    function compute_latest_version
-        set -l l_github_coordinates $argv[1]
-        printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$l_github_coordinates/releases/latest | jq -r '.tag_name')
-    end
     function compute_target_artifact
         set -l l_binary $argv[1]
         set -l l_target_version $argv[2]
         set -l l_target_version_short $argv[3]
         printf $l_binary"-linux-amd64.tar.gz"
-    end
-    function compute_target_url
-        set -l l_github_coordinates $argv[1]
-        set -l l_target_version $argv[2]
-        set -l l_target_version_short $argv[3]
-        set -l l_target_artifact $argv[4]
-        printf https://github.com/$l_github_coordinates/releases/download/$l_target_version/$l_target_artifact
     end
     # Nothing more to customize down here (crossing fingers)
     execute $binary_version_cmd >/dev/null ^/dev/null
