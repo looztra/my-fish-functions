@@ -115,6 +115,7 @@ function download_and_untar_and_install
     curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary}.tgz $target_url
     and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
     and mv $tmpdir/{$binary} ~/.local/bin/{$binary}
+    and chmod +x ~/.local/bin/{$binary}
 end
 
 function _generic_update -d 'Generic updater'
