@@ -38,7 +38,7 @@ end
 # Usefull
 #
 function github_api_status -d 'Get github api status and quota'
-    curl -u "looztra:$GITHUB_TOKEN" -i https://api.github.com/users/looztra
+    curl -u "$GITHUB_BASIC_AUTH" -i https://api.github.com/users/looztra
 end
 function gitc -d 'Clone a git repository and prefix the local directory with the owner'
     if test -z "$argv"
