@@ -87,12 +87,13 @@ function compute_latest_version -d "github style compute_latest_version"
     set -l l_github_coordinates $argv[1]
     printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$l_github_coordinates/releases/latest | jq -r '.tag_name')
 end
-function compute_target_url -d "github style compute_target_url"
-    set -l l_github_coordinates $argv[1]
-    set -l l_target_version $argv[2]
-    set -l l_target_version_short $argv[3]
-    set -l l_target_artifact $argv[4]
-    printf https://github.com/$l_github_coordinates/releases/download/$l_target_version/$l_target_artifact
+function compute_target_url_github -d "github style compute_target_url"
+    set -l github_coordinates $argv[1]
+    set -l target_version $argv[2]
+    set -l target_version_short $argv[3]
+    set -l target_artifact $argv[4]
+    set -l binary $argv[5]
+    printf https://github.com/$github_coordinates/releases/download/$target_version/$target_artifact
 end
 function create_temp_dir -d "create tmp download dir according to pattern"
     set -l l_pattern $argv[1]
@@ -111,19 +112,34 @@ function download_and_untar_and_install
     set -l target_url $argv[1]
     set -l tmpdir $argv[2]
     set -l binary $argv[3]
+    set -l no_auth $argv[4]
+    set -l untar_binary_ext $argv[5]
+    set -l untar_dir $argv[6]
+    set -l binary_prefix $argv[7]
     echo "Downloading from $target_url"
-    curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary}.tgz $target_url
+    if test -n "$no_auth"
+        curl -Lo $tmpdir/{$binary}.tgz $target_url
+    else
+        curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary}.tgz $target_url
+    end
+
     and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
-    and mv $tmpdir/{$binary} ~/.local/bin/{$binary}
+    and mv $tmpdir/{$binary}{$untar_binary_ext} ~/.local/bin/{$binary_prefix}{$binary}
     and chmod +x ~/.local/bin/{$binary}
 end
 
+function _use_compute_target_url_github
+    if type -q compute_target_url
+        functions --erase compute_target_url
+    end
+    functions --copy compute_target_url_github compute_target_url
+end
 function _generic_update -d 'Generic updater'
     set -l binary $argv[1]
     set -l github_coordinates $argv[2]
     set -l binary_version_cmd $argv[3..-1]
     #
-    printf "binary : [$binary]\ngithub_coordinates : [$github_coordinates]\nbinary_version_cmd : [$binary_version_cmd]\n"
+    printf "binary             : [$binary]\ngithub_coordinates : [$github_coordinates]\nbinary_version_cmd : [$binary_version_cmd]\n"
     #
     set -l tmpdir (create_temp_dir $binary)
     execute $binary_version_cmd >/dev/null ^/dev/null
@@ -143,7 +159,7 @@ function _generic_update -d 'Generic updater'
         set -l target_artifact (compute_target_artifact $binary)
         echo "Found target_artifact [$target_artifact]"
         echo "Current version is not target/latest ($target_version), downloading..."
-        set -l target_url (compute_target_url $github_coordinates $target_version $target_version_short $target_artifact)
+        set -l target_url (compute_target_url $github_coordinates $target_version $target_version_short $target_artifact $binary)
         #
         download_and_install $target_url $tmpdir $binary
         and rm -rf $tmpdir
@@ -792,42 +808,34 @@ function krew-update -d 'Install latest krew release'
     set -l binary krew
     set -l binary_version_cmd kubectl-{$binary} version
     set -l github_coordinates GoogleContainerTools/krew
-    set -l tmpdir (mktemp -d)
 
     function compute_version
         kubectl-krew version | grep GitTag | cut -d "v" -f2
     end
-    execute $binary_version_cmd >/dev/null ^/dev/null
-    if test $status -eq 0
-        set current_version (compute_version)
-        echo "Current version $current_version"
-    else
-        set current_version ""
-        echo "[$binary] is not installed yet"
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf $binary".tar.gz"
     end
-    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
-    set target_version_short (echo $target_version | tr -d "v")
-    if not test -z "$argv"
-        set target_version $argv
+    function compute_target_url -d "google style compute_target_url"
+        set -l github_coordinates $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        set -l target_artifact $argv[4]
+        set -l binary $argv[5]
+        printf https://storage.googleapis.com/{$binary}/{$target_version}/{$target_artifact}
     end
-    if [ $target_version_short = $current_version ]
-        echo "Current version is already target/latest"
-    else
-        set -l target_artifact {$binary}.tar.gz
-        echo "Current version is not target/latest ($target_version), downloading..."
-        set target_url https://storage.googleapis.com/{$binary}/{$target_version}/{$target_artifact}
-        echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary}.tgz $target_url
-        and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
-        and mv $tmpdir/{$binary}-linux_amd64 ~/.local/bin/kubectl-{$binary}
-        and rm -rf $tmpdir
-        execute $binary_version_cmd >/dev/null ^/dev/null
-        if test $status -eq 0
-            echo "Installed version "(compute_version)
-        else
-            echo "[$binary] could not be installed, check logs"
-        end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        download_and_untar_and_install $target_url $tmpdir $binary NO_AUTH "-linux_amd64" "" "kubectl-"
     end
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
 end
 
 function kubeval-update -d 'Install latest kubeval release'
@@ -849,8 +857,10 @@ function kubeval-update -d 'Install latest kubeval release'
         set -l target_url $argv[1]
         set -l tmpdir $argv[2]
         set -l binary $argv[3]
-        download_and_untar_and_install $target_url $tmpdir $binary
+        download_and_untar_and_install $target_url $tmpdir $binary "" "" "" ""
     end
+    _use_compute_target_url_github
+
     #
     # Nothing more to customize down here (crossing fingers)
     #
@@ -858,11 +868,11 @@ function kubeval-update -d 'Install latest kubeval release'
 end
 
 function list-updaters -d 'List available installers/updaters'
-  for candidate in (functions -n)
-    if string match -q -- '*-update' $candidate
-      printf "$candidate\n"
+    for candidate in (functions -n)
+        if string match -q -- '*-update' $candidate
+            printf "$candidate\n"
+        end
     end
-  end
 end
 
 function clean-packagekit-cache -d 'Clean effing PackageKit cache'
