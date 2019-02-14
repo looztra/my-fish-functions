@@ -858,29 +858,11 @@ function kubeval-update -d 'Install latest kubeval release'
 end
 
 function list-updaters -d 'List available installers/updaters'
-    for tool in minikube\
- minishift\
- kubectl\
- oc\
- compose\
- machine\
- terraform\
- packer\
- bat\
- stern\
- rke\
- bats\
- kubespy\
- dep\
- vault\
- terraform-docs\
- k9s\
- rbac-lookup\
-kustomize\
-krew-update\
-kubeval
-        echo "$tool-update"
+  for candidate in (functions -n)
+    if string match -q -- '*-update' $candidate
+      printf "$candidate\n"
     end
+  end
 end
 
 function clean-packagekit-cache -d 'Clean effing PackageKit cache'
