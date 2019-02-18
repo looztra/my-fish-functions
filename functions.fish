@@ -101,11 +101,23 @@ function create_temp_dir -d "create tmp download dir according to pattern"
     mkdir -p $l_base_dir
     printf (mktemp -d $l_base_dir/$l_pattern.XXXXXXXXX)
 end
-function download_and_install
+
+function download_and_install_simple
     set -l target_url $argv[1]
     set -l tmpdir $argv[2]
     set -l binary $argv[3]
-    echo "Nothing here for now"
+    set -l no_auth $argv[4]
+
+    echo "Downloading from $target_url"
+    if test -n "$no_auth"
+        curl -Lo $tmpdir/{$binary} $target_url
+    else
+        curl -u $GITHUB_BASIC_AUTH -Lo $tmpdir/{$binary} $target_url
+    end
+    chmod +x $tmpdir/{$binary}
+    mv $tmpdir/{$binary} ~/.local/bin/
+    rm -rf $tmpdir
+
 end
 
 function download_and_untar_and_install
@@ -156,7 +168,7 @@ function _generic_update -d 'Generic updater'
     if [ $target_version_short = $current_version ]
         echo "Current version is already target/latest"
     else
-        set -l target_artifact (compute_target_artifact $binary)
+        set -l target_artifact (compute_target_artifact $binary $target_version $target_version_short)
         echo "Found target_artifact [$target_artifact]"
         echo "Current version is not target/latest ($target_version), downloading..."
         set -l target_url (compute_target_url $github_coordinates $target_version $target_version_short $target_artifact $binary)
@@ -770,37 +782,25 @@ function kustomize-update -d 'Install latest kustomize release'
     function compute_version
         kustomize version | cut -d ":" -f3 | cut -d " " -f1
     end
-    execute $binary_version_cmd >/dev/null ^/dev/null
-    if test $status -eq 0
-        set current_version (compute_version)
-        echo "Current version $current_version"
-    else
-        set current_version ""
-        echo "[$binary] is not installed yet"
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_linux_amd64" $binary $target_version_short
     end
-    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
-    set target_version_short (echo $target_version | tr -d "v")
-    if not test -z "$argv"
-        set target_version $argv
+
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        download_and_install_simple $target_url $tmpdir $binary ""
     end
-    if [ $target_version_short = $current_version ]
-        echo "Current version is already target/latest"
-    else
-        set -l target_artifact {$binary}_{$target_version_short}_linux_amd64
-        echo "Current version is not target/latest ($target_version), downloading..."
-        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
-        echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary} $target_url
-        and chmod +x $tmpdir/{$binary}
-        and mv $tmpdir/{$binary} ~/.local/bin/
-        and rm -rf $tmpdir
-        execute $binary_version_cmd >/dev/null ^/dev/null
-        if test $status -eq 0
-            echo "Installed version "(compute_version)
-        else
-            echo "[$binary] could not be installed, check logs"
-        end
-    end
+
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
 end
 
 function krew-update -d 'Install latest krew release'
@@ -848,10 +848,10 @@ function kubeval-update -d 'Install latest kubeval release'
         kubeval --version | grep Version | cut -d ":" -f2 | tr -d " "
     end
     function compute_target_artifact
-        set -l l_binary $argv[1]
-        set -l l_target_version $argv[2]
-        set -l l_target_version_short $argv[3]
-        printf $l_binary"-linux-amd64.tar.gz"
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf $binary"-linux-amd64.tar.gz"
     end
     function download_and_install
         set -l target_url $argv[1]
