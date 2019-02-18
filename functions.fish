@@ -83,9 +83,33 @@ function gitct -d 'Clone a git repository, prefix the local dir with owner, and 
 end
 #
 # Installers / Updaters shared functions
-function compute_latest_version -d "github style compute_latest_version"
-    set -l l_github_coordinates $argv[1]
-    printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$l_github_coordinates/releases/latest | jq -r '.tag_name')
+function compute_latest_version -d "rely on latest"
+    set -l github_coordinates $argv[1]
+    printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$github_coordinates/releases/latest | jq -r '.tag_name')
+end
+function compute_latest_version_from_latest -d "rely on latest"
+    set -l github_coordinates $argv[1]
+    printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$github_coordinates/releases/latest | jq -r '.tag_name')
+end
+
+function compute_latest_version_from_tags -d "rely on tags"
+    set -l github_coordinates $argv[1]
+    printf (curl -u $GITHUB_BASIC_AUTH -s https://api.github.com/repos/$github_coordinates/tags | jq -rc '.[0] | .name')
+end
+function _use_compute_latest_version_from_latest
+    if type -q compute_latest_version
+        functions --erase compute_latest_version
+    end
+    functions --copy compute_latest_version_from_latest compute_latest_version
+end
+function _use_compute_latest_version_from_tags
+    if type -q compute_latest_version
+        functions --erase compute_latest_version
+    end
+    functions --copy compute_latest_version_from_tags compute_latest_version
+end
+function _reset_compute_latest_version
+    _use_compute_latest_version_from_latest
 end
 function compute_target_url_github -d "github style compute_target_url"
     set -l github_coordinates $argv[1]
@@ -102,7 +126,7 @@ function create_temp_dir -d "create tmp download dir according to pattern"
     printf (mktemp -d $l_base_dir/$l_pattern.XXXXXXXXX)
 end
 
-function download_and_install_simple
+function download_and_install_binary
     set -l target_url $argv[1]
     set -l tmpdir $argv[2]
     set -l binary $argv[3]
@@ -128,7 +152,6 @@ function download_and_untar_and_install
     set -l untar_binary_ext $argv[5]
     set -l untar_dir $argv[6]
     set -l binary_prefix $argv[7]
-    echo "Downloading from $target_url"
     if test -n "$no_auth"
         curl -Lo $tmpdir/{$binary}.tgz $target_url
     else
@@ -137,9 +160,14 @@ function download_and_untar_and_install
 
     and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
     and mv $tmpdir/{$binary}{$untar_binary_ext} ~/.local/bin/{$binary_prefix}{$binary}
-    and chmod +x ~/.local/bin/{$binary}
+    and chmod +x ~/.local/bin/{$binary_prefix}{$binary}
 end
-
+function _use_download_and_install_binary
+    if type -q download_and_install
+        functions --erase download_and_install
+    end
+    functions --copy download_and_install_binary download_and_install
+end
 function _use_compute_target_url_github
     if type -q compute_target_url
         functions --erase compute_target_url
@@ -712,20 +740,36 @@ end
 
 function k9s-update -d 'Update k9s to latest release'
     # https://github.com/derailed/k9s/releases/download/0.1.2/k9s_0.1.2_Linux_x86_64.tar.gz
-    set -l tmpdir (mktemp -d ~/tmp/tmp.k9s-XXXXXXXX)
-    set -l github_coordinates derailed/k9s
     set -l binary k9s
-    file $tmpdir
-    set -l target_version (curl -s https://api.github.com/repos/{$github_coordinates}/tags | jq -rc '.[0] | .name')
-    set -l target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$binary}_{$target_version}_Linux_x86_64.tar.gz
-    echo "Target url : $target_url"
-    curl -Lo $tmpdir/$binary.tgz $target_url
-    file $tmpdir/$binary.tgz
-    tar --directory $tmpdir -xf $tmpdir/$binary.tgz
-    chmod +x $tmpdir/{$binary}
-    mv $tmpdir/{$binary} ~/.local/bin/
-    rm -rf $tmpdir
-    k9s version
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates derailed/k9s
+    function compute_version
+        k9s version | cut -d " " -f1 | cut -d ":" -f2
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
+    end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_latest_version_from_tags
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+    _reset_compute_latest_version
+
 end
 
 function rbac-lookup-update -d 'Install latest rbac-lookup release'
@@ -733,43 +777,33 @@ function rbac-lookup-update -d 'Install latest rbac-lookup release'
     set -l binary rbac-lookup
     set -l binary_version_cmd $binary version
     set -l github_coordinates reactiveops/rbac-lookup
-    set -l tmpdir (mktemp -d)
 
     function compute_version
         rbac-lookup version | cut -d " " -f 3
     end
-    execute $binary_version_cmd >/dev/null ^/dev/null
-    if test $status -eq 0
-        set current_version (compute_version)
-        echo "Current version $current_version"
-    else
-        set current_version ""
-        echo "[$binary] is not installed yet"
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
     end
-    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r '.tag_name')
-    set target_version_short (echo $target_version | tr -d "v")
-    if not test -z "$argv"
-        set target_version $argv
+
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
     end
-    if [ $target_version_short = $current_version ]
-        echo "Current version is already target/latest"
-    else
-        set -l target_artifact {$binary}_{$target_version_short}_Linux_x86_64.tar.gz
-        echo "Current version is not target/latest ($target_version), downloading..."
-        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
-        echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary}.tgz $target_url
-        and tar --directory $tmpdir -xf $tmpdir/$binary.tgz
-        and chmod +x $tmpdir/{$binary}
-        and mv $tmpdir/{$binary} ~/.local/bin/
-        and rm -rf $tmpdir
-        execute $binary_version_cmd >/dev/null ^/dev/null
-        if test $status -eq 0
-            echo "Installed version "(compute_version)
-        else
-            echo "[$binary] could not be installed, check logs"
-        end
-    end
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+
 end
 
 function kustomize-update -d 'Install latest kustomize release'
@@ -777,7 +811,6 @@ function kustomize-update -d 'Install latest kustomize release'
     set -l binary kustomize
     set -l binary_version_cmd $binary version
     set -l github_coordinates kubernetes-sigs/kustomize
-    set -l tmpdir (mktemp -d)
 
     function compute_version
         kustomize version | cut -d ":" -f3 | cut -d " " -f1
@@ -789,13 +822,7 @@ function kustomize-update -d 'Install latest kustomize release'
         printf "%s_%s_linux_amd64" $binary $target_version_short
     end
 
-    function download_and_install
-        set -l target_url $argv[1]
-        set -l tmpdir $argv[2]
-        set -l binary $argv[3]
-        download_and_install_simple $target_url $tmpdir $binary ""
-    end
-
+    _use_download_and_install_binary
     _use_compute_target_url_github
     #
     # Nothing more to customize down here (crossing fingers)
@@ -830,7 +857,11 @@ function krew-update -d 'Install latest krew release'
         set -l target_url $argv[1]
         set -l tmpdir $argv[2]
         set -l binary $argv[3]
-        download_and_untar_and_install $target_url $tmpdir $binary NO_AUTH "-linux_amd64" "" "kubectl-"
+        set -l no_auth NO_AUTH_BECAUSE_GOOGLE_STORAGE
+        set -l untar_binary_ext "-linux_amd64"
+        set -l untar_dir ""
+        set -l binary_prefix "kubectl-"
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
     end
     #
     # Nothing more to customize down here (crossing fingers)
@@ -857,10 +888,39 @@ function kubeval-update -d 'Install latest kubeval release'
         set -l target_url $argv[1]
         set -l tmpdir $argv[2]
         set -l binary $argv[3]
-        download_and_untar_and_install $target_url $tmpdir $binary "" "" "" ""
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
     end
     _use_compute_target_url_github
 
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function terragrunt-update -d 'Install latest terragrunt release'
+    # https://github.com/gruntwork-io/terragrunt/releases/download/v0.18.0/terragrunt_linux_amd64
+    set -l binary terragrunt
+    set -l binary_version_cmd $binary --help
+    set -l github_coordinates gruntwork-io/terragrunt
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+        terragrunt --help | grep -A2 VERSION | paste -sd ',' | tr -d '[:space:]' | cut -d "," -f2 | tr -d "v"
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_linux_amd64" $binary
+    end
+
+    _use_download_and_install_binary
+    _use_compute_target_url_github
     #
     # Nothing more to customize down here (crossing fingers)
     #
