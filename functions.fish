@@ -907,7 +907,6 @@ function terragrunt-update -d 'Install latest terragrunt release'
     set -l binary terragrunt
     set -l binary_version_cmd $binary --help
     set -l github_coordinates gruntwork-io/terragrunt
-    set -l tmpdir (mktemp -d)
 
     function compute_version
         terragrunt --help | grep -A2 VERSION | paste -sd ',' | tr -d '[:space:]' | cut -d "," -f2 | tr -d "v"
@@ -917,6 +916,30 @@ function terragrunt-update -d 'Install latest terragrunt release'
         set -l target_version $argv[2]
         set -l target_version_short $argv[3]
         printf "%s_linux_amd64" $binary
+    end
+
+    _use_download_and_install_binary
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function ytt-update -d 'Install latest ytt release'
+    # https://github.com/get-ytt/ytt/releases/download/v0.1.0/ytt-linux-amd64
+    set -l binary ytt
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates get-ytt/ytt
+
+    function compute_version
+        ytt version | cut -d " " -f2
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s-linux-amd64" $binary
     end
 
     _use_download_and_install_binary
