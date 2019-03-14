@@ -974,6 +974,30 @@ function reg-update -d 'Install latest reg release'
     _generic_update $binary $github_coordinates $binary_version_cmd
 end
 
+function skaffold-update -d 'Install latest skaffold release'
+    # https://github.com/GoogleContainerTools/skaffold/releases/download/v0.24.0/skaffold-linux-amd64
+    set -l binary skaffold
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates GoogleContainerTools/skaffold
+
+    function compute_version
+        skaffold version | tr -d "v"
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s-linux-amd64" $binary
+    end
+
+    _use_download_and_install_binary
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
 function list-updaters -d 'List available installers/updaters'
     for candidate in (functions -n)
         if string match -q -- '*-update' $candidate
