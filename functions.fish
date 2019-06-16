@@ -1031,6 +1031,39 @@ function kube-capacity-update -d 'Install latest kube-capacity release'
     _generic_update $binary $github_coordinates $binary_version_cmd
 end
 
+function conftest-update -d 'Install latest conf-test release'
+    # https://github.com/instrumenta/conftest/releases/download/v0.4.2/conftest_0.4.2_Linux_x86_64.tar.gz
+    set -l binary conftest
+    set -l github_coordinates instrumenta/conftest
+    set -l binary_version_cmd $binary version
+
+    function compute_version
+        conftest --version | grep Version | cut -d " " -f2
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
+    end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_target_url_github
+
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
 function list-updaters -d 'List available installers/updaters'
     for candidate in (functions -n)
         if string match -q -- '*-update' $candidate
