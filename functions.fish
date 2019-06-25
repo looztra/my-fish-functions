@@ -870,9 +870,10 @@ function krew-update -d 'Install latest krew release'
 end
 
 function kubeval-update -d 'Install latest kubeval release'
-    # https://github.com/garethr/kubeval/releases/download/0.7.3/kubeval-linux-amd64.tar.gz
+    # OLD https://github.com/garethr/kubeval/releases/download/0.7.3/kubeval-linux-amd64.tar.gz
+    # https://github.com/instrumenta/kubeval/releases/download/0.10.0/kubeval-linux-amd64.tar.gz
     set -l binary kubeval
-    set -l github_coordinates garethr/$binary
+    set -l github_coordinates instrumenta/$binary
     set -l binary_version_cmd $binary --version
 
     function compute_version
