@@ -214,6 +214,34 @@ end
 #
 # Installers / Updaters
 #
+function minikube-update -d 'Install latest minikube release'
+    execute minikube version >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (minikube version | cut -d " " -f 3)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "Minikube is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/kubernetes/minikube/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/{$target_version}/minikube-linux-amd64
+        and chmod +x minikube
+        and mv minikube ~/.local/bin/
+        execute minikube version >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(minikube version | cut -d " " -f 3)
+        else
+            echo "Minikube could not be installed, check logs"
+        end
+    end
+end
 
 function minishift-update -d 'Install latest minishift release'
     execute minishift version >/dev/null ^/dev/null
@@ -245,6 +273,48 @@ function minishift-update -d 'Install latest minishift release'
             echo "minishift could not be installed, check logs"
         end
     end
+end
+
+function kubectl-update -d 'Update kubectl to latest release'
+    set -l binary kubectl
+    set -l binary_artifact $binary
+    set -l tmpdir (mktemp -d)
+    set -l binary_version_cmd $binary version --client --short
+    set -l version_url https://storage.googleapis.com/kubernetes-release/release/stable.txt
+    function compute_artifact_url
+        set -l t_version $argv[1]
+        set -l t_artifact $argv[2]
+        printf "https://storage.googleapis.com/kubernetes-release/release/$t_version/bin/linux/amd64/$t_artifact"
+    end
+    #
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (execute $binary_version_cmd | cut -d " " -f 3)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "$binary is not installed yet"
+    end
+    set target_version (curl -s $version_url)
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest ($target_version)"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        echo "target_url "(compute_artifact_url $target_version $binary_artifact)
+        curl -Lo $tmpdir/$binary (compute_artifact_url $target_version $binary_artifact)
+        and chmod +x $tmpdir/$binary
+        and mv $tmpdir/$binary ~/.local/bin/
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 3)
+        else
+            echo "$binary could not be installed, check logs"
+        end
+    end
+    rm -rf $tmpdir
 end
 
 function oc-update -d 'Update oc to latest release'
@@ -288,6 +358,66 @@ function oc-update -d 'Update oc to latest release'
     rm -rf $tmpdir
 end
 
+function compose-update -d 'Update docker-compose to version provided in param or latest release if no param provided'
+    set compose_version (curl -s https://api.github.com/repos/docker/compose/releases/latest | jq .tag_name | tr -d '"')
+    set -l tmpdir (mktemp -d)
+    if not test -z "$argv"
+        set compose_version $argv
+    end
+    echo "Retreiving docker-compose version $compose_version"
+    echo "gna"
+    curl -Lo {$tmpdir}/docker-compose https://github.com/docker/compose/releases/download/$compose_version/docker-compose-Linux-x86_64
+    chmod +x {$tmpdir}/docker-compose
+    and mv {$tmpdir}/docker-compose ~/.local/bin/
+    which docker-compose
+    docker-compose version
+    rm -rf $tmpdir
+end
+
+function machine-update -d 'Update docker-machine to version provided in param or latest release if no param provided'
+    set machine_version (curl -s https://api.github.com/repos/docker/machine/releases/latest | jq .tag_name | tr -d '"')
+    set -l tmpdir (mktemp -d)
+    set version_type default
+    if not test -z "$argv"
+        set version_type forced
+        set machine_version $argv
+    end
+    echo "Retreiving docker-machine version $machine_version ($version_type)"
+    curl -Lo {$tmpdir}/docker-machine https://github.com/docker/machine/releases/download/$machine_version/docker-machine-Linux-x86_64
+    chmod +x {$tmpdir}/docker-machine
+    and mv {$tmpdir}/docker-machine ~/.local/bin/
+    which docker-machine
+    docker-machine version
+    rm -rf $tmpdir
+end
+
+function terraform-update -d 'Update terraform to latest release'
+    set -l tmpdir (mktemp -d ~/tmp/tmp.terraform-XXXXXXXX)
+    file $tmpdir
+    set tf_version (curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest | jq .tag_name | tr -d '"' | tr -d 'v')
+    curl -Lo $tmpdir/terraform.latest.zip https://releases.hashicorp.com/terraform/{$tf_version}/terraform_{$tf_version}_linux_amd64.zip
+    unzip -o $tmpdir/terraform.latest.zip -d $tmpdir/
+    chmod +x $tmpdir/terraform
+    and mv $tmpdir/terraform ~/.local/bin
+    and rm -rf $tmpdir
+    terraform version
+end
+
+function packer-update -d 'Update packer to latest release'
+    set -l tmpdir (mktemp -d ~/tmp/tmp.packer-XXXXXXXX)
+    file $tmpdir
+    set -l target_version (curl -s https://api.github.com/repos/hashicorp/packer/tags | jq -rc '.[0] | .name' | tr -d 'v')
+    set -l target_url https://releases.hashicorp.com/packer/{$target_version}/packer_{$target_version}_linux_amd64.zip
+    echo "Target url : $target_url"
+    curl -Lo $tmpdir/packer.latest.zip $target_url
+    file $tmpdir/packer.latest.zip
+    unzip -o $tmpdir/packer.latest.zip -d $tmpdir/
+    chmod +x $tmpdir/packer
+    and mv $tmpdir/packer ~/.local/bin
+    and rm -rf $tmpdir
+    packer version
+end
+
 function bat-update -d 'Install latest bat release'
     # https://github.com/sharkdp/bat/releases/download/v0.6.1/bat-v0.6.1-x86_64-unknown-linux-gnu.tar.gz
     set -l binary bat
@@ -327,6 +457,46 @@ function bat-update -d 'Install latest bat release'
     end
 end
 
+function stern-update -d 'Install latest stern release'
+    # https://github.com/wercker/stern/releases/download/1.8.0/stern_linux_amd64
+    set -l binary stern
+    set -l binary_artifact $binary
+    set -l binary_version_cmd $binary --version
+    set github_coordinates wercker/stern
+    set -l tmpdir (mktemp -d)
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (execute $binary_version_cmd | cut -d " " -f 3)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    set -l target_artifact {$binary}_linux_amd64
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary_artifact} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 3)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
 function rke-update -d 'Install latest rke release'
     # https://github.com/rancher/rke/releases/download/v0.1.9/rke_linux-amd64
     set -l binary rke
@@ -357,6 +527,47 @@ function rke-update -d 'Install latest rke release'
         curl -Lo $tmpdir/{$binary_artifact} $target_url
         and chmod +x $tmpdir/{$binary}
         and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(execute $binary_version_cmd | cut -d " " -f 3)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
+function helm-update -d 'Install latest helm release'
+    # https://github.com/helm/helm/releases/latest
+    # https://storage.googleapis.com/kubernetes-helm/helm-v2.11.0-linux-amd64.tar.gz
+    set -l binary helm
+    set -l binary_artifact {$binary}.tgz
+    set -l binary_version_cmd $binary version --client --template '"{{.Client.SemVer}}"'
+    set github_coordinates helm/helm
+    set -l tmpdir (mktemp -d /tmp/tmp.{$binary}-XXXXXXXX)
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (execute $binary_version_cmd | cut -d " " -f 3)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    set -l target_artifact {$binary}-{$target_version}-linux-amd64.tar.gz
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        set target_url https://storage.googleapis.com/kubernetes-helm/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary_artifact} $target_url
+        and tar --directory $tmpdir -xf $tmpdir/{$binary_artifact}
+        and mv $tmpdir/linux-amd64/{$binary} ~/.local/bin/
         and rm -rf $tmpdir
         execute $binary_version_cmd >/dev/null ^/dev/null
         if test $status -eq 0
@@ -426,6 +637,49 @@ function kubespy-update -d 'Install latest kubespy release'
     end
 end
 
+function dep-update -d 'Install latest dep release'
+    # https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64
+    set -l binary dep
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates golang/dep
+    set -l target_artifact {$binary}-linux-amd64
+    set -l tmpdir (mktemp -d)
+
+    function compute_version
+        dep version | grep version | grep -v "go" | sed "s/  *//g" | cut -d ":" -f2
+    end
+    execute $binary_version_cmd >/dev/null ^/dev/null
+    if test $status -eq 0
+        set current_version (compute_version)
+        echo "Current version $current_version"
+    else
+        set current_version ""
+        echo "[$binary] is not installed yet"
+    end
+    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq .tag_name | tr -d '"')
+    if not test -z "$argv"
+        set target_version $argv
+    end
+    if [ $target_version = $current_version ]
+        echo "Current version is already target/latest"
+    else
+        echo "Current version is not target/latest ($target_version), downloading..."
+        set target_version_short (echo $target_version | tr -d "v")
+        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
+        echo "Downloading from $target_url"
+        curl -Lo $tmpdir/{$binary} $target_url
+        and chmod +x $tmpdir/{$binary}
+        and mv $tmpdir/{$binary} ~/.local/bin/
+        and rm -rf $tmpdir
+        execute $binary_version_cmd >/dev/null ^/dev/null
+        if test $status -eq 0
+            echo "Installed version "(compute_version)
+        else
+            echo "[$binary] could not be installed, check logs"
+        end
+    end
+end
+
 function terraform-docs-update -d 'Install latest terraform-docs release'
     # https://github.com/segmentio/terraform-docs/releases/download/v0.6.0/terraform-docs-v0.6.0-linux-amd64
     set -l binary terraform-docs
@@ -469,6 +723,113 @@ function terraform-docs-update -d 'Install latest terraform-docs release'
     end
 end
 
+function vault-update -d 'Update vault to latest release'
+    set -l tmpdir (mktemp -d ~/tmp/tmp.vault-XXXXXXXX)
+    file $tmpdir
+    set -l target_version (curl -s https://api.github.com/repos/hashicorp/vault/tags | jq -rc '.[0] | .name' | tr -d 'v')
+    set -l target_url https://releases.hashicorp.com/vault/{$target_version}/vault_{$target_version}_linux_amd64.zip
+    echo "Target url : $target_url"
+    curl -Lo $tmpdir/vault.latest.zip $target_url
+    file $tmpdir/vault.latest.zip
+    unzip -o $tmpdir/vault.latest.zip -d $tmpdir/
+    chmod +x $tmpdir/vault
+    and mv $tmpdir/vault ~/.local/bin
+    and rm -rf $tmpdir
+    vault version
+end
+
+function k9s-update -d 'Update k9s to latest release'
+    # https://github.com/derailed/k9s/releases/download/0.1.2/k9s_0.1.2_Linux_x86_64.tar.gz
+    set -l binary k9s
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates derailed/k9s
+    function compute_version
+        k9s version | cut -d " " -f1 | cut -d ":" -f2
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
+    end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_latest_version_from_tags
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+    _reset_compute_latest_version
+
+end
+
+function rbac-lookup-update -d 'Install latest rbac-lookup release'
+    # https://github.com/reactiveops/rbac-lookup/releases/download/v0.2.1/rbac-lookup_0.2.1_Linux_x86_64.tar.gz
+    set -l binary rbac-lookup
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates reactiveops/rbac-lookup
+
+    function compute_version
+        rbac-lookup version | cut -d " " -f 3
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
+    end
+
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+
+end
+
+function kustomize-update -d 'Install latest kustomize release'
+    # https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.1/kustomize_2.0.1_linux_amd64
+    set -l binary kustomize
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates kubernetes-sigs/kustomize
+
+    function compute_version
+        kustomize version | cut -d ":" -f3 | cut -d " " -f1
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_linux_amd64" $binary $target_version_short
+    end
+
+    _use_download_and_install_binary
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
 function krew-update -d 'Install latest krew release'
     # https://storage.googleapis.com/krew/v0.2.1/krew.tar.gz
     set -l binary krew
@@ -502,6 +863,64 @@ function krew-update -d 'Install latest krew release'
         set -l binary_prefix "kubectl-"
         download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
     end
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function kubeval-update -d 'Install latest kubeval release'
+    # OLD https://github.com/garethr/kubeval/releases/download/0.7.3/kubeval-linux-amd64.tar.gz
+    # https://github.com/instrumenta/kubeval/releases/download/0.10.0/kubeval-linux-amd64.tar.gz
+    set -l binary kubeval
+    set -l github_coordinates instrumenta/$binary
+    set -l binary_version_cmd $binary --version
+
+    function compute_version
+        kubeval --version | grep Version | cut -d ":" -f2 | tr -d " "
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf $binary"-linux-amd64.tar.gz"
+    end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_target_url_github
+
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function terragrunt-update -d 'Install latest terragrunt release'
+    # https://github.com/gruntwork-io/terragrunt/releases/download/v0.18.0/terragrunt_linux_amd64
+    set -l binary terragrunt
+    set -l binary_version_cmd $binary --help
+    set -l github_coordinates gruntwork-io/terragrunt
+
+    function compute_version
+        terragrunt --help | grep -A2 VERSION | paste -sd ',' | tr -d '[:space:]' | cut -d "," -f2 | tr -d "v"
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_linux_amd64" $binary
+    end
+
+    _use_download_and_install_binary
+    _use_compute_target_url_github
     #
     # Nothing more to customize down here (crossing fingers)
     #
@@ -550,6 +969,96 @@ function reg-update -d 'Install latest reg release'
 
     _use_download_and_install_binary
     _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function skaffold-update -d 'Install latest skaffold release'
+    # https://github.com/GoogleContainerTools/skaffold/releases/download/v0.24.0/skaffold-linux-amd64
+    set -l binary skaffold
+    set -l binary_version_cmd $binary version
+    set -l github_coordinates GoogleContainerTools/skaffold
+
+    function compute_version
+        skaffold version | tr -d "v"
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s-linux-amd64" $binary
+    end
+
+    _use_download_and_install_binary
+    _use_compute_target_url_github
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function kube-capacity-update -d 'Install latest kube-capacity release'
+    # https://github.com/robscott/kube-capacity/releases/download/0.2.0/kube-capacity_0.2.0_Linux_x86_64.tar.gz
+    set -l binary kube-capacity
+    set -l github_coordinates robscott/kube-capacity
+    set -l binary_version_cmd $binary version
+
+    function compute_version
+        kube-capacity version | cut -d" " -f3
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
+    end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_target_url_github
+
+    #
+    # Nothing more to customize down here (crossing fingers)
+    #
+    _generic_update $binary $github_coordinates $binary_version_cmd
+end
+
+function conftest-update -d 'Install latest conf-test release'
+    # https://github.com/instrumenta/conftest/releases/download/v0.4.2/conftest_0.4.2_Linux_x86_64.tar.gz
+    set -l binary conftest
+    set -l github_coordinates instrumenta/conftest
+    set -l binary_version_cmd $binary version
+
+    function compute_version
+        conftest --version | grep Version | cut -d " " -f2
+    end
+    function compute_target_artifact
+        set -l binary $argv[1]
+        set -l target_version $argv[2]
+        set -l target_version_short $argv[3]
+        printf "%s_%s_Linux_x86_64.tar.gz" $binary $target_version_short
+    end
+    function download_and_install
+        set -l target_url $argv[1]
+        set -l tmpdir $argv[2]
+        set -l binary $argv[3]
+        set -l no_auth ""
+        set -l untar_binary_ext ""
+        set -l untar_dir ""
+        set -l binary_prefix ""
+        download_and_untar_and_install $target_url $tmpdir $binary $no_auth $untar_binary_ext $untar_dir $binary_prefix
+    end
+    _use_compute_target_url_github
+
     #
     # Nothing more to customize down here (crossing fingers)
     #
