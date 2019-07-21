@@ -426,49 +426,6 @@ function kubespy-update -d 'Install latest kubespy release'
     end
 end
 
-function terraform-docs-update -d 'Install latest terraform-docs release'
-    # https://github.com/segmentio/terraform-docs/releases/download/v0.6.0/terraform-docs-v0.6.0-linux-amd64
-    set -l binary terraform-docs
-    set -l binary_version_cmd $binary --version
-    set -l github_coordinates segmentio/terraform-docs
-    set -l tmpdir (mktemp -d /tmp/tmp.$binary.XXXXXXXX)
-
-    function compute_version
-        terraform-docs --version
-    end
-    execute $binary_version_cmd >/dev/null ^/dev/null
-    if test $status -eq 0
-        set current_version "v"(compute_version)
-        echo "Current version $current_version"
-    else
-        set current_version ""
-        echo "[$binary] is not installed yet"
-    end
-    set target_version (curl -s https://api.github.com/repos/{$github_coordinates}/releases/latest | jq -r .tag_name)
-    if not test -z "$argv"
-        set target_version $argv
-    end
-    if [ $target_version = $current_version ]
-        echo "Current version is already target/latest"
-    else
-        echo "Current version is not target/latest ($target_version), downloading..."
-        set target_version_short (echo $target_version | tr -d "v")
-        set -l target_artifact {$binary}-{$target_version}-linux-amd64
-        set target_url https://github.com/{$github_coordinates}/releases/download/{$target_version}/{$target_artifact}
-        echo "Downloading from $target_url"
-        curl -Lo $tmpdir/{$binary} $target_url
-        and chmod +x $tmpdir/{$binary}
-        and mv $tmpdir/{$binary} ~/.local/bin/
-        and rm -rf $tmpdir
-        execute $binary_version_cmd >/dev/null ^/dev/null
-        if test $status -eq 0
-            echo "Installed version v"(compute_version)
-        else
-            echo "[$binary] could not be installed, check logs"
-        end
-    end
-end
-
 function krew-update -d 'Install latest krew release'
     # https://storage.googleapis.com/krew/v0.2.1/krew.tar.gz
     set -l binary krew
@@ -516,30 +473,6 @@ function ytt-update -d 'Install latest ytt release'
 
     function compute_version
         ytt version | cut -d " " -f2
-    end
-    function compute_target_artifact
-        set -l binary $argv[1]
-        set -l target_version $argv[2]
-        set -l target_version_short $argv[3]
-        printf "%s-linux-amd64" $binary
-    end
-
-    _use_download_and_install_binary
-    _use_compute_target_url_github
-    #
-    # Nothing more to customize down here (crossing fingers)
-    #
-    _generic_update $binary $github_coordinates $binary_version_cmd
-end
-
-function reg-update -d 'Install latest reg release'
-    #https://github.com/genuinetools/reg/releases/download/v0.16.0/reg-linux-amd64
-    set -l binary reg
-    set -l binary_version_cmd $binary version
-    set -l github_coordinates genuinetools/reg
-
-    function compute_version
-        reg version | grep version | grep -v "go" | cut -d ":" -f2 | tr -d " " | tr -d "v"
     end
     function compute_target_artifact
         set -l binary $argv[1]
