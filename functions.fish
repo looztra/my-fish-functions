@@ -465,28 +465,8 @@ function krew-update -d 'Install latest krew release'
     _generic_update $binary $github_coordinates $binary_version_cmd
 end
 
-function ytt-update -d 'Install latest ytt release'
-    # https://github.com/get-ytt/ytt/releases/download/v0.1.0/ytt-linux-amd64
-    set -l binary ytt
-    set -l binary_version_cmd $binary version
-    set -l github_coordinates get-ytt/ytt
-
-    function compute_version
-        ytt version | cut -d " " -f2
-    end
-    function compute_target_artifact
-        set -l binary $argv[1]
-        set -l target_version $argv[2]
-        set -l target_version_short $argv[3]
-        printf "%s-linux-amd64" $binary
-    end
-
-    _use_download_and_install_binary
-    _use_compute_target_url_github
-    #
-    # Nothing more to customize down here (crossing fingers)
-    #
-    _generic_update $binary $github_coordinates $binary_version_cmd
+function skype-update -d 'Update skype through flatpak'
+    flatpak update com.skype.Client
 end
 
 function list-updaters -d 'List available installers/updaters'
@@ -495,6 +475,10 @@ function list-updaters -d 'List available installers/updaters'
             printf "$candidate\n"
         end
     end
+end
+
+function flatpak-list-packages -d 'List installed flatpak packages'
+    flatpak list
 end
 
 function clean-packagekit-cache -d 'Clean effing PackageKit cache'
